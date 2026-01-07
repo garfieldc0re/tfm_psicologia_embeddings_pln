@@ -41,7 +41,7 @@ def _crear_cliente_reddit() -> praw.Reddit:
 
 # 3. TOOL 1 para ADK (CORREGIDA: multi-búsqueda + deduplicado)
 def buscar_subreddits_psicologia(
-    termino_busqueda: str = "",
+    termino_busqueda: str | None = None, 
     incluir_idiomas: str = "es,en",
     max_subreddits: int = 100,
     min_suscriptores: int = 300,
@@ -99,7 +99,7 @@ def buscar_subreddits_psicologia(
         "psiquiatría",
     ]
 
-    if termino_busqueda and termino_busqueda.strip():
+    if termino_busqueda is not None and termino_busqueda.strip():
         queries.insert(0, termino_busqueda.strip())
 
     candidatos: Dict[str, Any] = {}
@@ -171,6 +171,145 @@ def buscar_subreddits_psicologia(
     resultados.sort(key=lambda x: x.get("suscriptores", 0), reverse=True)
     return resultados[:max_subreddits]
 
+def detectar_idioma_simple(texto: str) -> str:
+    """
+    Heurística sencilla:
+    - Si detecta tildes/ñ/¿/¡ o stopwords típicas -> 'es'
+    - Si no -> 'en'
+    """
+    t = f" {texto.lower()} "
+
+    if any(c in t for c in ["á", "é", "í", "ó", "ú", "ñ", "¿", "¡"]):
+        return "es"
+
+    marcadores_es = [" el ", " la ", " de ", " que ", " y ", " en ", " por ", " para ", " pero ", " con "]
+    if any(m in t for m in marcadores_es):
+        return "es"
+
+    return "en"
+
+
+# -----------------------------
+# TOOL 2
+# Buscar posts relevantes dentro de subreddits
+# -----------------------------
+def buscar_posts_actitud_psicologia(
+    subreddits: List[str],
+    limite_posts: int = 300,
+    limite_total: int = 3000
+) -> List[Dict]:
+
+    """
+    Busca posts dentro de varios subreddits que tengan relación
+    con actitudes hacia la psicología / terapia.
+    """
+    reddit = _crear_cliente_reddit()
+
+    palabras_clave = [
+        # Inglés
+        # Psicología / profesionales
+        "psychology", "psychologist", "clinical psychologist",
+        "mental health professional", "mental health care",
+        "mental health services",
+
+        # Terapia / proceso terapéutico
+        "therapy", "therapist", "psychotherapy",
+        "counseling", "counselling",
+        "talk therapy", "cbt", "cognitive behavioral therapy",
+        "starting therapy", "going to therapy",
+        "went to therapy", "seeing a therapist",
+        "in therapy", "therapy sessions",
+
+        # Actitudes, creencias, utilidad
+        "does therapy work", "does it work",
+        "worth it", "helpful", "not helpful",
+        "effective", "ineffective",
+        "worked for me", "didn't work for me",
+        "waste of money", "best decision",
+
+        # Barreras, estigma, desconfianza
+        "stigma", "stigmatized", "skeptic", "skeptical",
+        "trust", "mistrust",
+        "afraid to go", "hesitant to seek help",
+        "embarrassed", "ashamed",
+        "negative experience", "bad therapist",
+
+        # Psiquiatría / diagnóstico (contextual)
+        "psychiatrist", "psychiatry",
+        "medication", "medication vs therapy",
+        "diagnosed", "mental disorder",
+    
+
+
+        # Español
+         # Psicología / profesionales
+        "psicología", "psicologo", "psicólogo", "psicóloga",
+        "profesional de la salud mental",
+        "servicios de salud mental",
+
+        # Terapia
+        "terapia", "terapeuta", "psicoterapia",
+        "terapia psicológica",
+        "ir a terapia", "empezar terapia",
+        "fui a terapia", "estoy en terapia",
+        "sesiones de terapia",
+
+        # Actitudes, creencias, utilidad
+        "sirve la terapia", "no sirve la terapia",
+        "merece la pena", "vale la pena",
+        "me ayudó", "no me ayudó",
+        "funciona", "no funciona",
+        "experiencia positiva", "experiencia negativa",
+
+        # Barreras y estigma
+        "estigma", "estigmatizado",
+        "desconfianza", "confianza",
+        "vergüenza", "miedo a ir",
+        "reticente", "reacio",
+        "mala experiencia", "mal psicólogo",
+
+        # Psiquiatría / diagnóstico (contextual)
+        "psiquiatra", "psiquiatría",
+        "medicación", "diagnóstico",
+        "trastorno mental"
+    ]
+
+    posts_encontrados = []
+    ids_vistos = set()  # ✅ evita duplicados dentro de la misma extracción
+
+    for nombre_subreddit in subreddits:
+        subreddit = reddit.subreddit(nombre_subreddit)
+
+        for post in subreddit.new(limit=limite_posts):
+            if post.id in ids_vistos:
+                continue
+
+            texto_total = f"{post.title} {post.selftext}".lower()
+
+            idioma = detectar_idioma_simple(texto_total)
+
+            if any(palabra in texto_total for palabra in palabras_clave):
+                ids_vistos.add(post.id)
+
+                posts_encontrados.append({
+                    "subreddit": nombre_subreddit,
+                    "id": post.id,  # ✅ tool 3 lo espera
+                    "titulo": post.title,
+                    "texto": post.selftext,
+                    "url": f"https://www.reddit.com{post.permalink}",  # ✅ estable
+                    "score": post.score,
+                    "num_comentarios": post.num_comments,
+                    "creado_utc": int(post.created_utc),  # ✅ tool 3 lo espera
+                    "idioma": idioma,
+
+                })
+
+                if len(posts_encontrados) >= limite_total:
+                    return posts_encontrados
+
+    # ✅ este return va AL FINAL de la función
+    return posts_encontrados
+
 
 
 # 2. tool 3? o 2?    
@@ -198,6 +337,7 @@ def guardar_posts_en_csv(
         "score",
         "num_comentarios",
         "creado_utc",
+        "idioma", #nuevo
     ]
 
     with open(nombre_fichero, "w", newline="", encoding="utf-8") as f:

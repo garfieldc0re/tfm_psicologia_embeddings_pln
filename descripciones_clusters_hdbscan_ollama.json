@@ -1,0 +1,30 @@
+{
+  "0": {
+    "label": "",
+    "keywords": [
+      "femenino",
+      "violencia",
+      "abuso",
+      "despersonalización"
+    ],
+    "description": "Describes un caso de violencia emocional en una relación abusiva y la búsqueda de ayuda para superarla.",
+    "attitude": "neutral"
+  },
+  "1": {
+    "label": "Clases de terapia",
+    "keywords": [
+      "terapia",
+      "psicología"
+    ],
+    "description": "Estimada, durante las últimas semanas he estado experimentando un gran cansancio y ansiedad. He sentido que estoy viviendo una serie de situaciones negativas que me hacen sentir como si estuviera a punto de colapsar. Me preocupa que mi ansiedad pueda ser una señal de algo más profundo que solo estar pasando por alto.",
+    "attitude": "Positiva"
+  },
+  "2": {
+    "label": "Strategy",
+    "keywords": [
+      "strategy"
+    ],
+    "description": "A strategy for trading in the stock market.",
+    "attitude": "neutral"
+  }
+}

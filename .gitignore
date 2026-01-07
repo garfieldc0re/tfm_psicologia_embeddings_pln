@@ -1,0 +1,10 @@
+# Entornos virtuales
+env/
+venv/
+.venv/
+
+# Archivos con claves / contraseñas
+.env
+*.env
+google.env
+reddit.env
